@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import {
+  getAuth,
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import { getMessaging, getToken } from "firebase/messaging";
 
 // Firebase configuration
@@ -22,6 +28,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deviceToken, setDeviceToken] = useState(null);
+  const [firebaseToken, setFirebaseToken] = useState(null);
 
   useEffect(() => {
     const init = async () => {
@@ -101,11 +108,12 @@ function App() {
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
-      const firebaseToken = await result.user.getIdToken();
+      const token = await result.user.getIdToken();
+      setFirebaseToken(token);
 
-      console.log("Firebase Token:", firebaseToken);
+      console.log("Firebase Token:", token);
 
-      const apiResponse = await authenticateWithBackend(firebaseToken);
+      const apiResponse = await authenticateWithBackend(token);
       console.log("Backend Response:", apiResponse);
 
       setUser({
@@ -147,6 +155,7 @@ function App() {
     try {
       await signOut(auth);
       setUser(null);
+      setFirebaseToken(null);
       console.log("User logged out successfully.");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -165,6 +174,7 @@ function App() {
           <h2>Welcome, {user.displayName}</h2>
           <img src={user.photoURL} alt="User" />
           <p>Email: {user.email}</p>
+          <p>Bearer Token: {firebaseToken}</p>
           <button onClick={handleLogout}>Logout</button>
           <ul>
             <li>Device Token: {deviceToken}</li>
