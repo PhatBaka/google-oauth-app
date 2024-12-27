@@ -5,7 +5,9 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
   signOut,
+  createUserWithEmailAndPassword,
 } from "firebase/auth";
 import { getMessaging, getToken } from "firebase/messaging";
 
@@ -29,18 +31,20 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [deviceToken, setDeviceToken] = useState(null);
   const [firebaseToken, setFirebaseToken] = useState(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     const init = async () => {
       try {
-        // Register the service worker
-        await navigator.serviceWorker.register('/firebase-messaging-sw.js', { type: 'module' });
+        await navigator.serviceWorker.register("/firebase-messaging-sw.js", {
+          type: "module",
+        });
         console.log("Service worker registered successfully.");
       } catch (error) {
         console.error("Service worker registration failed:", error);
       }
 
-      // Listen for authentication state changes
       const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
         setUser(currentUser);
         setLoading(false);
@@ -67,8 +71,6 @@ function App() {
         if (token) {
           console.log("Device Token:", token);
           setDeviceToken(token);
-
-          // Send the token to the backend for registration
           await registerDeviceToken(token);
         } else {
           console.error("No registration token available. Request permission to generate one.");
@@ -104,9 +106,9 @@ function App() {
     }
   };
 
-  const handleLogin = async () => {
-    const provider = new GoogleAuthProvider();
+  const handleLoginWithGoogle = async () => {
     try {
+      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const token = await result.user.getIdToken();
       setFirebaseToken(token);
@@ -124,7 +126,39 @@ function App() {
         accessToken: apiResponse.accessToken,
       });
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("Google login failed:", error.message);
+    }
+  };
+
+  const handleLoginWithEmail = async () => {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const token = await result.user.getIdToken();
+      setFirebaseToken(token);
+
+      console.log("Firebase Token:", token);
+
+      const apiResponse = await authenticateWithBackend(token);
+      console.log("Backend Response:", apiResponse);
+
+      setUser({
+        id: apiResponse.id,
+        role: apiResponse.role,
+        email: apiResponse.email,
+        image: apiResponse.image,
+        accessToken: apiResponse.accessToken,
+      });
+    } catch (error) {
+      console.error("Email login failed:", error.message);
+    }
+  };
+
+  const handleSignupWithEmail = async () => {
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      console.log("Signup successful:", result.user);
+    } catch (error) {
+      console.error("Signup failed:", error.message);
     }
   };
 
@@ -171,18 +205,34 @@ function App() {
       <h1>Notifications App</h1>
       {user ? (
         <div>
-          <h2>Welcome, {user.displayName}</h2>
-          <img src={user.photoURL} alt="User" />
+          <h2>Welcome, {user.displayName || user.email}</h2>
+          <img src={user.photoURL || ""} alt="User" />
           <p>Email: {user.email}</p>
           <p>Bearer Token: {firebaseToken}</p>
           <button onClick={handleLogout}>Logout</button>
           <ul>
             <li>Device Token: {deviceToken}</li>
-            <li>Role: {user.role}</li>
+            <li>Role: {user.role || "Unknown"}</li>
           </ul>
         </div>
       ) : (
-        <button onClick={handleLogin}>Login with Google</button>
+        <div>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button onClick={handleLoginWithEmail}>Login with Email</button>
+          <button onClick={handleSignupWithEmail}>Sign up with Email</button>
+          <button onClick={handleLoginWithGoogle}>Login with Google</button>
+        </div>
       )}
     </div>
   );
